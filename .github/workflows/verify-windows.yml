@@ -2,6 +2,11 @@ name: Verify Windows
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag, such as v1.0.0. Leave blank to verify only.'
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -87,3 +92,51 @@ jobs:
           name: VerticalLineCounter-win-x64
           path: ${{ runner.temp }}/VerticalLineCounter-win-x64.zip
           if-no-files-found: error
+
+  publish-release:
+    if: ${{ inputs.release_tag != '' }}
+    needs: verify-windows
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    concurrency:
+      group: windows-release-${{ inputs.release_tag }}
+      cancel-in-progress: false
+    steps:
+      - name: Attach verified ZIP and publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo 'Use a release tag such as v1.0.0.'
+            exit 1
+          fi
+
+          matching_refs=$(gh api "repos/$GH_REPO/git/matching-refs/tags/$RELEASE_TAG" --jq '.[].ref')
+          if grep -Fxq "refs/tags/$RELEASE_TAG" <<< "$matching_refs"; then
+            echo "Tag $RELEASE_TAG already exists. Choose a new version."
+            exit 1
+          fi
+
+          artifact_dir=$(mktemp -d)
+          gh run download "$GITHUB_RUN_ID" --name VerticalLineCounter-win-x64 --dir "$artifact_dir"
+          zip="$artifact_dir/VerticalLineCounter-win-x64.zip"
+          unzip -tq "$zip"
+
+          if is_draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft); then
+            if [[ "$is_draft" != true ]]; then
+              echo "Release $RELEASE_TAG is already published."
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_TAG" --draft --target "$GITHUB_SHA" \
+              --title "Vertical Line Counter $RELEASE_TAG" \
+              --notes 'Extract the Windows x64 ZIP and keep all files together. Run VerticalLineCounter.exe with the absolute path to a JPEG. The package includes the .NET runtime.'
+          fi
+
+          gh release upload "$RELEASE_TAG" "$zip"
+          gh release edit "$RELEASE_TAG" --target "$GITHUB_SHA" --draft=false
