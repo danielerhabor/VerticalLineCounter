@@ -1,57 +1,40 @@
-﻿using SkiaSharp;
-
-namespace VerticalLineCounter;
-
+﻿
 class Program
 {
     static void Main(string[] args)
     {
-        // var file = "/Users/derhabor/Documents/Unassigned/programming/VerticalLineCounter/img_1.jpg";
-        // var file = "/Users/derhabor/Documents/Unassigned/programming/VerticalLineCounter/img_2.jpg";
-        // var file = "/Users/derhabor/Documents/Unassigned/programming/VerticalLineCounter/img_3.jpg";
-        var file = "/Users/derhabor/Documents/Unassigned/programming/VerticalLineCounter/img_4.jpg";
-
-        if (!Path.IsPathFullyQualified(file))
+        try
         {
-            Console.WriteLine("Path is not fully qualified");
+             if (args.Length != 1)
+        {
+            Console.WriteLine("Usage: VerticalLineCounter <absolute-image-path>");
+            return;
         }
 
-        using SKBitmap img = SKBitmap.Decode(file);
 
-        int midY = img.Height / 2;
-        int width = img.Width;
+        string filePath = args[0];
 
-        byte threshold = 128;
-
-        var numBlackLines = 0;
-
-        var isPrevBlack = false;
-
-        for (var x = 0; x < width; x++)
+        if (!Path.IsPathFullyQualified(filePath))
         {
-            SKColor px = img.GetPixel(x, midY);
-            // starting line
-            var isBlack = px.Red < threshold &&
-                          px.Green < threshold &&
-                          px.Blue < threshold;
-            if (isBlack)
-            {
-                isPrevBlack = true;
-            }
-            else if (!isBlack && isPrevBlack)
-            {
-                numBlackLines++; // seen a white after a black finishing line
-                isPrevBlack = false;
-            }
+            Console.WriteLine("Error: Please provide an absolute image path.");
+            return;
         }
 
-        if (isPrevBlack)
+        if (!File.Exists(filePath))
         {
-            numBlackLines++; // assuming black line spans to the end of the width
+            Console.WriteLine("Error: Image file does not exist.");
+            return;
         }
 
-        Console.WriteLine("Hello world!");
-        Console.WriteLine($"Number of lines: {numBlackLines}");
+        var count = LineCounter.CountLines(filePath);
+
+        Console.WriteLine(count);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+       
     }
     
 }
