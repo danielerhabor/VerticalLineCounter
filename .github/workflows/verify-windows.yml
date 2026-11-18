@@ -10,11 +10,11 @@ jobs:
   verify-windows:
     runs-on: windows-2025
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           persist-credentials: false
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '10.0.x'
 
@@ -82,7 +82,7 @@ jobs:
           $zip = Join-Path $env:RUNNER_TEMP 'VerticalLineCounter-win-x64.zip'
           Compress-Archive -Path (Join-Path $publish '*') -DestinationPath $zip
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: VerticalLineCounter-win-x64
           path: ${{ runner.temp }}/VerticalLineCounter-win-x64.zip
