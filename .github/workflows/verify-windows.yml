@@ -1,0 +1,89 @@
+name: Verify Windows
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-windows:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Test and package the Windows executable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          dotnet --version
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read the .NET SDK version' }
+
+          dotnet test VerticalLineCounter.slnx -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
+
+          $publish = Join-Path $env:RUNNER_TEMP 'VerticalLineCounter-win-x64'
+          dotnet publish VerticalLineCounter/VerticalLineCounter.csproj -c Release -r win-x64 --self-contained true -o $publish
+          if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
+
+          $exe = Join-Path $publish 'VerticalLineCounter.exe'
+          $fixtures = (Resolve-Path 'VerticalLineCounter.Tests/Fixtures/Generated').Path
+
+          function Assert-Output {
+              param([string]$Case, [string]$Expected, [string[]]$CliArgs)
+
+              $output = & $exe @CliArgs 2>&1
+              $exitCode = $LASTEXITCODE
+              $actual = ($output -join "`n").Trim()
+
+              if ($exitCode -ne 0 -or $actual -cne $Expected) {
+                  throw "$Case expected '$Expected', got '$actual' (exit $exitCode)"
+              }
+              Write-Host "$Case passed with output '$actual'"
+          }
+
+          $counts = [ordered]@{
+              'single-thick-line.jpg' = 1
+              'three-lines.jpg'       = 3
+              'full-black.jpg'        = 1
+              'seven-mixed-lines.jpg' = 7
+              'all-white.jpg'         = 0
+              'single-thin-line.jpg'  = 1
+              'thin-white-gap.jpg'    = 2
+              'boundary-lines.jpg'    = 2
+              'five-even-lines.jpg'   = 5
+          }
+
+          foreach ($name in $counts.Keys) {
+              Assert-Output -Case $name -Expected "$($counts[$name])" -CliArgs @((Join-Path $fixtures $name))
+          }
+
+          $spacedPath = Join-Path $env:RUNNER_TEMP 'boundary lines.jpg'
+          $missingPath = Join-Path $env:RUNNER_TEMP 'missing image.jpg'
+          $invalidPath = Join-Path $env:RUNNER_TEMP 'invalid image.jpg'
+          Copy-Item (Join-Path $fixtures 'boundary-lines.jpg') $spacedPath
+          Set-Content -LiteralPath $invalidPath -Value 'This file is not a JPEG.'
+
+          $usage = 'Usage: VerticalLineCounter <absolute-image-path>'
+          Assert-Output -Case 'Absolute path with spaces' -Expected '2' -CliArgs @($spacedPath)
+          Assert-Output -Case 'Zero arguments' -Expected $usage -CliArgs @()
+          Assert-Output -Case 'Two arguments' -Expected $usage -CliArgs @('one', 'two')
+          Assert-Output -Case 'Relative path' -Expected 'Error: Please provide an absolute image path.' -CliArgs @('relative.jpg')
+          Assert-Output -Case 'Missing file' -Expected 'Error: Image file does not exist.' -CliArgs @($missingPath)
+          Assert-Output -Case 'Invalid JPEG' -Expected 'Error: Cannot decode the image.' -CliArgs @($invalidPath)
+
+          $zip = Join-Path $env:RUNNER_TEMP 'VerticalLineCounter-win-x64.zip'
+          Compress-Archive -Path (Join-Path $publish '*') -DestinationPath $zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VerticalLineCounter-win-x64
+          path: ${{ runner.temp }}/VerticalLineCounter-win-x64.zip
+          if-no-files-found: error
