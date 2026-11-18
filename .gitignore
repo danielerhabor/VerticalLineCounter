@@ -480,3 +480,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Provided test fixtures are kept locally.
+/VerticalLineCounter.Tests/Fixtures/Provided/
+

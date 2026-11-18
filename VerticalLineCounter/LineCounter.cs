@@ -1,7 +1,7 @@
 
 using SkiaSharp;
 
-class LineCounter
+public class LineCounter
 {
     private const int BlackThreshold = 128;
     
@@ -24,9 +24,7 @@ class LineCounter
         for (var x = 0; x < width; x++)
         {
             SKColor px = img.GetPixel(x, midY);
-            var isBlack = px.Red < BlackThreshold &&
-                          px.Green < BlackThreshold &&
-                          px.Blue < BlackThreshold;
+            var isBlack = px.Red < BlackThreshold && px.Green < BlackThreshold && px.Blue < BlackThreshold;
             if (isBlack)
             {
                 isPrevBlack = true;

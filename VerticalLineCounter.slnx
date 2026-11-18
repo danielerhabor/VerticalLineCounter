@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="VerticalLineCounter/VerticalLineCounter.csproj" />
+  <Project Path="VerticalLineCounter.Tests/VerticalLineCounter.Tests.csproj" />
+</Solution>
